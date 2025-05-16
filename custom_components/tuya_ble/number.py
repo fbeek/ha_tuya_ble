@@ -464,6 +464,24 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
             ],
         },
     ),
+    "sfkzq": TuyaBLECategoryNumberMapping(
+        products={
+            "nxquc5lb":  # Smart water bottle
+            [
+                TuyaBLENumberMapping(
+                    dp_id=11,
+                    description=NumberEntityDescription(
+                        key="countdown",
+                        native_max_value=86400,
+                        native_min_value=0,
+                        native_unit_of_measurement=UnitOfTime.SECONDS,
+                        native_step=1,
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
+            ],
+        },
+    ),
     "ggq": TuyaBLECategoryNumberMapping(
         products={
             "6pahkcau": [  # Irrigation computer PARKSIDE PPB A1
