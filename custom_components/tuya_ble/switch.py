@@ -135,6 +135,7 @@ mapping: dict[str, TuyaBLECategorySwitchMapping] = {
                     dp_id=1,
                     description=SwitchEntityDescription(
                         key="water_valve",
+                        icon="mdi:pipe-valve"
                     ),
                 ),
             ]

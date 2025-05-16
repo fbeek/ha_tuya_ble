@@ -10,6 +10,7 @@ _Original HASS component forked from https://github.com/PlusPlus-ua/ha_tuya_ble_
 
 _Merged several changes by @airy10 and @patriot1889, including light support_
 
+_Some fixes added by @fbeek to fix the automatic water valves
 
 ## Installation
 
