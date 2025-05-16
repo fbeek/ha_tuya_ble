@@ -83,6 +83,18 @@ mapping: dict[str, TuyaBLECategorySelectMapping] = {
                         entity_category=EntityCategory.CONFIG,
                     ),
                 ),
+                TuyaBLESelectMapping(
+                    dp_id=13,
+                    description=SelectEntityDescription(
+                        key="smart_weather",
+                        options=[
+                            "sunny",
+                            "cloudy",
+                            "rainy",
+                        ],
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
             ]
         }
     ),
