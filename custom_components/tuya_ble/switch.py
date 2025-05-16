@@ -112,19 +112,45 @@ def set_water_valve_with_time_use(
         value: Boolean value indicating whether to turn the valve on or off
     """
     # Default time_use value in seconds (1 hour = 3600 seconds)
-    default_time_use = 30
+    default_time_use = 900
 
+    # If turning on, also set the time_use parameter (DP ID 9)
     if value:
-        # Check if there's a time_use entity that has a value we can use
+        # Get the watering_duration value from the virtual entity
         time_use_value = default_time_use
+
+        # Find the watering_duration entity in Home Assistant
+        import homeassistant.helpers.entity_registry as er
+        entity_registry = er.async_get(self._hass)
+
+        # Look for the watering_duration entity for this device
+        watering_duration_entity_id = None
+        for entity_id, entity_entry in entity_registry.entities.items():
+            if (entity_entry.unique_id == f"{self._device.address}_watering_duration" and
+                entity_entry.domain == "number"):
+                watering_duration_entity_id = entity_id
+                break
+
+        # If we found the entity, get its current value
+        if watering_duration_entity_id:
+            watering_duration_state = self._hass.states.get(watering_duration_entity_id)
+            if watering_duration_state and watering_duration_state.state not in ('unknown', 'unavailable'):
+                try:
+                    time_use_value = float(watering_duration_state.state)
+                except (ValueError, TypeError):
+                    _LOGGER.warning(f"Invalid watering_duration value: {watering_duration_state.state}, using default")
+            else:
+                _LOGGER.debug(f"Watering duration entity state not available, using default: {default_time_use}")
+        else:
+            _LOGGER.debug(f"Watering duration entity not found, using default: {default_time_use}")
 
         # Set the time_use parameter
         time_use_datapoint = self._device.datapoints.get_or_create(
             11,  # DP ID for time_use
             TuyaBLEDataPointType.DT_VALUE,
-            time_use_value,
+            int(time_use_value),
         )
-        self._hass.create_task(time_use_datapoint.set_value(time_use_value))
+        self._hass.create_task(time_use_datapoint.set_value(int(time_use_value)))
 
     # First set the switch state
     datapoint = self._device.datapoints.get_or_create(
@@ -133,9 +159,6 @@ def set_water_valve_with_time_use(
         value,
     )
     self._hass.create_task(datapoint.set_value(value))
-
-    # If turning on, also set the time_use parameter (DP ID 9)
-
 
 
 @dataclass
