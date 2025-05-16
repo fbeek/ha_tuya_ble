@@ -10,7 +10,7 @@ _Original HASS component forked from https://github.com/PlusPlus-ua/ha_tuya_ble_
 
 _Merged several changes by @airy10 and @patriot1889, including light support_
 
-_Some fixes added by @fbeek to fix the automatic water valves
+_Some fixes added by @fbeek to fix the automatic water valves_, as these need to send the water duration before enabling the valve and added a virtual number device to set these via HA, because normaly this value is saved in the app.
 
 ## Installation
 
