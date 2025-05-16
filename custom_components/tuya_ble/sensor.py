@@ -120,6 +120,16 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                         state_class=SensorStateClass.MEASUREMENT,
                     ),
                 ),
+                TuyaBLESensorMapping(
+                    dp_id=15,
+                    description=SensorEntityDescription(
+                        key="use_time_one",
+                        name="Use Time One",
+                        device_class=SensorDeviceClass.DURATION,
+                        native_unit_of_measurement=UnitOfTime.SECONDS,
+                        state_class=SensorStateClass.MEASUREMENT,
+                    ),
+                ),
             ],
         }
     ),

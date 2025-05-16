@@ -503,6 +503,19 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
                     dp_id=11,
                     description=NumberEntityDescription(
                         key="countdown",
+                        name="Countdown",
+                        native_max_value=86400,
+                        native_min_value=0,
+                        native_unit_of_measurement=UnitOfTime.SECONDS,
+                        native_step=1,
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
+                TuyaBLENumberMapping(
+                    dp_id=15,
+                    description=NumberEntityDescription(
+                        key="use_time_one",
+                        name="Use Time One",
                         native_max_value=86400,
                         native_min_value=0,
                         native_unit_of_measurement=UnitOfTime.SECONDS,
