@@ -93,7 +93,7 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                     dp_id=7,
                     description=SensorEntityDescription(
                         key="battery_percentage",
-                        name="Battery Percentage",
+                        name="Batterie Prozent",
                         device_class=SensorDeviceClass.BATTERY,
                         native_unit_of_measurement=PERCENTAGE,
                         entity_category=EntityCategory.DIAGNOSTIC,
@@ -104,7 +104,7 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                     dp_id=9,
                     description=SensorEntityDescription(
                         key="time_use",
-                        name="Time Used",
+                        name="Gesamtbewässerungszeit",
                         device_class=SensorDeviceClass.DURATION,
                         native_unit_of_measurement=UnitOfTime.SECONDS,
                         state_class=SensorStateClass.MEASUREMENT,
@@ -114,7 +114,7 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                     dp_id=11,
                     description=SensorEntityDescription(
                         key="countdown",
-                        name="Countdown",
+                        name="Restzeit aktueller Zyklus",
                         device_class=SensorDeviceClass.DURATION,
                         native_unit_of_measurement=UnitOfTime.SECONDS,
                         state_class=SensorStateClass.MEASUREMENT,
@@ -124,10 +124,23 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                     dp_id=15,
                     description=SensorEntityDescription(
                         key="use_time_one",
-                        name="Use Time One",
+                        name="dauer letzter Zyklus",
                         device_class=SensorDeviceClass.DURATION,
                         native_unit_of_measurement=UnitOfTime.SECONDS,
                         state_class=SensorStateClass.MEASUREMENT,
+                    ),
+                ),
+                TuyaBLESensorMapping(
+                    dp_id=12,
+                    description=SensorEntityDescription(
+                        key="Status",
+                        icon="mdi:state-machine",
+                        device_class=SensorDeviceClass.ENUM,
+                        options=[
+                            "auto",
+                            "manual",
+                            "idle"
+                        ],
                     ),
                 ),
             ],

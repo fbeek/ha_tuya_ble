@@ -215,6 +215,18 @@ class TuyaBLECategoryNumberMapping:
     mapping: list[TuyaBLENumberMapping] | None = None
 
 
+# Special class for virtual entities that don't correspond to actual datapoints
+@dataclass
+class TuyaBLEVirtualNumberMapping:
+    description: NumberEntityDescription
+    force_add: bool = True
+    is_available: TuyaBLENumberIsAvailable = None
+    getter: TuyaBLENumberGetter = None
+    setter: TuyaBLENumberSetter = None
+    mode: NumberMode = NumberMode.BOX
+    default_value: float = 3600  # Default to 1 hour
+
+
 mapping: dict[str, TuyaBLECategoryNumberMapping] = {
     "sfkzq": TuyaBLECategoryNumberMapping(
         products={
@@ -243,6 +255,20 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
                         native_step=1,
                         entity_category=EntityCategory.CONFIG,
                     ),
+                ),
+                # Add a virtual entity for watering duration setting
+                TuyaBLEVirtualNumberMapping(
+                    description=NumberEntityDescription(
+                        key="watering_duration",
+                        name="Watering Duration",
+                        icon="mdi:water-timer",
+                        native_max_value=86400,  # 30 days in seconds
+                        native_min_value=60,       # Minimum 1 minute
+                        native_unit_of_measurement=UnitOfTime.SECONDS,
+                        native_step=60,            # 1 minute steps
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                    default_value=900,  # Default to 15 minutes
                 ),
             ]
         }
@@ -495,25 +521,6 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
             ],
         },
     ),
-    "sfkzq": TuyaBLECategoryNumberMapping(
-        products={
-            "nxquc5lb":
-            [
-                TuyaBLENumberMapping(
-                    dp_id=15,
-                    description=NumberEntityDescription(
-                        key="use_time_one",
-                        name="Use Time One",
-                        native_max_value=86400,
-                        native_min_value=0,
-                        native_unit_of_measurement=UnitOfTime.SECONDS,
-                        native_step=1,
-                        entity_category=EntityCategory.CONFIG,
-                    ),
-                ),
-            ],
-        },
-    ),
     "ggq": TuyaBLECategoryNumberMapping(
         products={
             "6pahkcau": [  # Irrigation computer PARKSIDE PPB A1
@@ -646,6 +653,84 @@ class TuyaBLENumber(TuyaBLEEntity, NumberEntity):
         if result and self._mapping.is_available:
             result = self._mapping.is_available(self, self._product)
         return result
+
+class TuyaBLEVirtualNumber(RestoreNumber):
+    """Representation of a virtual Tuya BLE number that persists its state."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        coordinator: DataUpdateCoordinator,
+        device: TuyaBLEDevice,
+        product: TuyaBLEProductInfo,
+        mapping: TuyaBLEVirtualNumberMapping,
+    ) -> None:
+        self._hass = hass
+        self._coordinator = coordinator
+        self._device = device
+        self._product = product
+        self._mapping = mapping
+        self._attr_mode = mapping.mode
+        self._attr_native_value = mapping.default_value
+
+        # Set entity attributes from description
+        self._attr_name = mapping.description.name
+        self._attr_icon = mapping.description.icon
+        self._attr_entity_category = mapping.description.entity_category
+        self._attr_native_min_value = mapping.description.native_min_value
+        self._attr_native_max_value = mapping.description.native_max_value
+        self._attr_native_step = mapping.description.native_step
+        self._attr_native_unit_of_measurement = mapping.description.native_unit_of_measurement
+
+        # Generate unique ID
+        self._attr_unique_id = f"{device.address}_{mapping.description.key}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device.address)},
+            "name": device.name,
+            "manufacturer": "Tuya",
+            "model": f"{device.category} {device.product_id}",
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        await super().async_added_to_hass()
+
+        # Restore previous state if available
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            try:
+                self._attr_native_value = float(last_state.state)
+            except (ValueError, TypeError):
+                self._attr_native_value = self._mapping.default_value
+
+        # Create storage directory if it doesn't exist
+        config_dir = self.hass.config.path(".storage")
+        os.makedirs(config_dir, exist_ok=True)
+
+        # Try to load from storage file
+        storage_file = os.path.join(config_dir, f"tuya_ble_virtual_{self._attr_unique_id}.json")
+        try:
+            if os.path.exists(storage_file):
+                with open(storage_file, "r") as f:
+                    data = json.load(f)
+                    if "value" in data:
+                        self._attr_native_value = float(data["value"])
+        except (ValueError, TypeError, json.JSONDecodeError, IOError):
+            pass
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Update the current value."""
+        self._attr_native_value = value
+        self.async_write_ha_state()
+
+        # Save to storage file
+        config_dir = self.hass.config.path(".storage")
+        storage_file = os.path.join(config_dir, f"tuya_ble_virtual_{self._attr_unique_id}.json")
+        try:
+            with open(storage_file, "w") as f:
+                json.dump({"value": value}, f)
+        except IOError:
+            _LOGGER.warning(f"Failed to save virtual number value to {storage_file}")
 
 
 async def async_setup_entry(
