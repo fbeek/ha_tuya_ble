@@ -9,6 +9,7 @@ from typing import Any, Callable
 from homeassistant.components.number import (
     NumberEntityDescription,
     NumberEntity,
+    RestoreNumber,
 )
 from homeassistant.components.number.const import NumberDeviceClass, NumberMode
 from homeassistant.config_entries import ConfigEntry
