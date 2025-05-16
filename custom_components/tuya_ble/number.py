@@ -213,8 +213,8 @@ class TuyaBLEHoldTimeMapping(TuyaBLENumberMapping):
 
 @dataclass
 class TuyaBLECategoryNumberMapping:
-    products: dict[str, list[TuyaBLENumberMapping]] | None = None
-    mapping: list[TuyaBLENumberMapping] | None = None
+    products: dict[str, list[TuyaBLENumberMapping | "TuyaBLEVirtualNumberMapping"]] | None = None
+    mapping: list[TuyaBLENumberMapping | "TuyaBLEVirtualNumberMapping"] | None = None
 
 
 # Special class for virtual entities that don't correspond to actual datapoints
@@ -227,6 +227,7 @@ class TuyaBLEVirtualNumberMapping:
     setter: TuyaBLENumberSetter = None
     mode: NumberMode = NumberMode.BOX
     default_value: float = 3600  # Default to 1 hour
+    coefficient: float = 1.0  # Added for compatibility with TuyaBLENumberMapping
 
 
 mapping: dict[str, TuyaBLECategoryNumberMapping] = {
@@ -234,30 +235,6 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
         products={
             "nxquc5lb":  # Smart Water Valve
             [
-                TuyaBLENumberMapping(
-                    dp_id=9,
-                    description=NumberEntityDescription(
-                        key="time_use",
-                        icon="mdi:timer",
-                        native_max_value=2592000,
-                        native_min_value=0,
-                        native_unit_of_measurement=UnitOfTime.SECONDS,
-                        native_step=1,
-                        entity_category=EntityCategory.CONFIG,
-                    ),
-                ),
-                TuyaBLENumberMapping(
-                    dp_id=11,
-                    description=NumberEntityDescription(
-                        key="countdown",
-                        icon="mdi:timer-outline",
-                        native_max_value=86400,
-                        native_min_value=0,
-                        native_unit_of_measurement=UnitOfTime.SECONDS,
-                        native_step=1,
-                        entity_category=EntityCategory.CONFIG,
-                    ),
-                ),
                 # Add a virtual entity for watering duration setting
                 TuyaBLEVirtualNumberMapping(
                     description=NumberEntityDescription(
@@ -593,7 +570,9 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
 }
 
 
-def get_mapping_by_device(device: TuyaBLEDevice) -> list[TuyaBLECategoryNumberMapping]:
+def get_mapping_by_device(
+    device: TuyaBLEDevice
+) -> list[TuyaBLENumberMapping | TuyaBLEVirtualNumberMapping]:
     category = mapping.get(device.category)
     if category is not None and category.products is not None:
         product_mapping = category.products.get(device.product_id)
@@ -608,7 +587,7 @@ def get_mapping_by_device(device: TuyaBLEDevice) -> list[TuyaBLECategoryNumberMa
 
 
 class TuyaBLENumber(TuyaBLEEntity, NumberEntity):
-    """Representation of a Tuya BLE Number."""
+    """Representation of a Tuya BLE number."""
 
     def __init__(
         self,
@@ -618,35 +597,45 @@ class TuyaBLENumber(TuyaBLEEntity, NumberEntity):
         product: TuyaBLEProductInfo,
         mapping: TuyaBLENumberMapping,
     ) -> None:
-        super().__init__(hass, coordinator, device, product, mapping.description)
+        super().__init__(
+            hass,
+            coordinator,
+            device,
+            product,
+            mapping.description
+        )
         self._mapping = mapping
         self._attr_mode = mapping.mode
 
     @property
     def native_value(self) -> float | None:
-        """Return the entity value to represent the entity state."""
-        if self._mapping.getter:
-            return self._mapping.getter(self, self._product)
+        """Return the current value."""
+        if self._mapping.getter is not None:
+            value = self._mapping.getter(self, self._product)
+            if value is not None:
+                return value
 
-        datapoint = self._device.datapoints[self._mapping.dp_id]
-        if datapoint:
-            return datapoint.value / self._mapping.coefficient
-
-        return self._mapping.description.native_min_value
+        # Access dp_id only for TuyaBLENumberMapping instances
+        if hasattr(self._mapping, 'dp_id'):
+            datapoint = self._device.datapoints[self._mapping.dp_id]
+            if datapoint:
+                if datapoint.value is not None:
+                    return datapoint.value / self._mapping.coefficient
+        return None
 
     def set_native_value(self, value: float) -> None:
-        """Set new value."""
-        if self._mapping.setter:
+        """Update the current value."""
+        if self._mapping.setter is not None:
             self._mapping.setter(self, self._product, value)
-            return
-        int_value = int(value * self._mapping.coefficient)
-        datapoint = self._device.datapoints.get_or_create(
-            self._mapping.dp_id,
-            TuyaBLEDataPointType.DT_VALUE,
-            int(int_value),
-        )
-        if datapoint:
-            self._hass.create_task(datapoint.set_value(int_value))
+        else:
+            # Access dp_id only for TuyaBLENumberMapping instances
+            if hasattr(self._mapping, 'dp_id'):
+                datapoint = self._device.datapoints.get_or_create(
+                    self._mapping.dp_id,
+                    self._mapping.dp_type or TuyaBLEDataPointType.DT_VALUE,
+                    int(value * self._mapping.coefficient),
+                )
+                self._hass.create_task(datapoint.set_value(int(value * self._mapping.coefficient)))
 
     @property
     def available(self) -> bool:
@@ -743,18 +732,38 @@ async def async_setup_entry(
     """Set up the Tuya BLE sensors."""
     data: TuyaBLEData = hass.data[DOMAIN][entry.entry_id]
     mappings = get_mapping_by_device(data.device)
-    entities: list[TuyaBLENumber] = []
+    entities = []
+
     for mapping in mappings:
-        if mapping.force_add or data.device.datapoints.has_id(
-            mapping.dp_id, mapping.dp_type
+        if isinstance(mapping, TuyaBLEVirtualNumberMapping):
+            # Add virtual number entity
+            entities.append(TuyaBLEVirtualNumber(
+                hass,
+                data.coordinator,
+                data.device,
+                data.product,
+                mapping,
+            ))
+        elif (
+            mapping.force_add or
+            data.device.datapoints.has_id(mapping.dp_id, mapping.dp_type)
         ):
-            entities.append(
+            if mapping.is_available is None or mapping.is_available(
                 TuyaBLENumber(
                     hass,
                     data.coordinator,
                     data.device,
                     data.product,
                     mapping,
-                )
-            )
+                ),
+                data.product,
+            ):
+                entities.append(TuyaBLENumber(
+                    hass,
+                    data.coordinator,
+                    data.device,
+                    data.product,
+                    mapping,
+                ))
+
     async_add_entities(entities)
