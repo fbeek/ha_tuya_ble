@@ -152,7 +152,6 @@ def set_water_valve_with_time_use(
         )
         self._hass.create_task(time_use_datapoint.set_value(int(time_use_value)))
 
-    # First set the switch state
     datapoint = self._device.datapoints.get_or_create(
         self._mapping.dp_id,
         TuyaBLEDataPointType.DT_BOOL,
