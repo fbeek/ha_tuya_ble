@@ -497,7 +497,7 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
     ),
     "sfkzq": TuyaBLECategoryNumberMapping(
         products={
-            "nxquc5lb":  # Smart water bottle
+            "nxquc5lb":
             [
                 TuyaBLENumberMapping(
                     dp_id=11,
