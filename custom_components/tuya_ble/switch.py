@@ -112,7 +112,19 @@ def set_water_valve_with_time_use(
         value: Boolean value indicating whether to turn the valve on or off
     """
     # Default time_use value in seconds (1 hour = 3600 seconds)
-    default_time_use = 15
+    default_time_use = 30
+
+    if value:
+        # Check if there's a time_use entity that has a value we can use
+        time_use_value = default_time_use
+
+        # Set the time_use parameter
+        time_use_datapoint = self._device.datapoints.get_or_create(
+            11,  # DP ID for time_use
+            TuyaBLEDataPointType.DT_VALUE,
+            time_use_value,
+        )
+        self._hass.create_task(time_use_datapoint.set_value(time_use_value))
 
     # First set the switch state
     datapoint = self._device.datapoints.get_or_create(
@@ -123,17 +135,7 @@ def set_water_valve_with_time_use(
     self._hass.create_task(datapoint.set_value(value))
 
     # If turning on, also set the time_use parameter (DP ID 9)
-    if value:
-        # Check if there's a time_use entity that has a value we can use
-        time_use_value = default_time_use
 
-        # Set the time_use parameter
-        time_use_datapoint = self._device.datapoints.get_or_create(
-            15,  # DP ID for time_use
-            TuyaBLEDataPointType.DT_VALUE,
-            time_use_value,
-        )
-        self._hass.create_task(time_use_datapoint.set_value(time_use_value))
 
 
 @dataclass
